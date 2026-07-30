@@ -1,8 +1,12 @@
 diff --git a/cli/tools/installer/global.rs b/cli/tools/installer/global.rs
 --- a/cli/tools/installer/global.rs
 +++ b/cli/tools/installer/global.rs
-@@
+@@ -178,7 +178,29 @@ pub async fn install_global(
+     let mut extra_imports = workspace_member_imports.clone();
+     extra_imports
+       .extend(package_json_dep_import_entries(&name_and_url.module_url));
 -    setup_config_dir(
++
 +    let config_dir =
 +      installation_dir.join(format!(".{}", name_and_url.name));
 +    let primary_shim = if cfg!(windows) {
@@ -17,7 +21,10 @@ diff --git a/cli/tools/installer/global.rs b/cli/tools/installer/global.rs
 +    // reusable completed install.
 +    if !had_published_install && config_dir.is_dir() {
 +      fs::remove_dir_all(&config_dir).with_context(|| {
-+        format!("failed removing incomplete install state '{}'", config_dir.display())
++        format!(
++          "failed removing incomplete install state '{}'",
++          config_dir.display()
++        )
 +      })?;
 +    }
 +
@@ -25,7 +32,7 @@ diff --git a/cli/tools/installer/global.rs b/cli/tools/installer/global.rs
        &name_and_url,
        &flags,
        cli_options.initial_cwd(),
-@@
+@@ -187,7 +209,22 @@ pub async fn install_global(
        install_flags_global.force,
        &extra_imports,
      )
@@ -48,3 +55,4 @@ diff --git a/cli/tools/installer/global.rs b/cli/tools/installer/global.rs
 +    }
  
      // create the install shim for the primary entry
+     create_install_shim(
