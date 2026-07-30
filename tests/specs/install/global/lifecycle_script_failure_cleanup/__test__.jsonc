@@ -10,7 +10,7 @@
         "--allow-scripts",
         "npm:@denotest/print-npm-user-agent@1.0.0"
       ],
-      "output": "[WILDCARD]failed with exit code 1[WILDCARD]",
+      "output": "[WILDCARD]postinstall[WILDCARD]failed with exit code 1[WILDCARD]",
       "exitCode": 1
     },
     {
@@ -29,8 +29,15 @@
         "--allow-scripts",
         "npm:@denotest/print-npm-user-agent@1.0.0"
       ],
-      "output": "[WILDCARD]failed with exit code 1[WILDCARD]",
+      "output": "[WILDCARD]postinstall[WILDCARD]failed with exit code 1[WILDCARD]",
       "exitCode": 1
+    },
+    {
+      "args": [
+        "eval",
+        "const exists = (path) => { try { Deno.statSync(path); return true; } catch { return false; } }; console.log(JSON.stringify({ config: exists('root/bin/.print-npm-user-agent'), shim: exists('root/bin/print-npm-user-agent') || exists('root/bin/print-npm-user-agent.cmd') }));"
+      ],
+      "output": "{\"config\":false,\"shim\":false}\n"
     }
   ]
 }
