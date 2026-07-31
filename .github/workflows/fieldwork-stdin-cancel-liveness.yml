@@ -1,0 +1,45 @@
+name: Fieldwork stdin cancellation liveness
+
+on:
+  pull_request:
+    paths:
+      - '.github/workflows/fieldwork-stdin-cancel-liveness.yml'
+      - 'tests/integration/stdin_cancel_liveness_probe.ts'
+      - 'tools/fieldwork/stdin_cancel_liveness_probe.py'
+      - 'ext/io/**'
+      - 'runtime/**'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  release-matrix:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 15
+    strategy:
+      fail-fast: false
+      matrix:
+        deno-version:
+          - v2.4.5
+          - v2.9.4
+    steps:
+      - uses: actions/checkout@v4
+      - uses: denoland/setup-deno@v2
+        with:
+          deno-version: ${{ matrix.deno-version }}
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+      - name: Run open-pipe and EOF controls
+        run: |
+          python tools/fieldwork/stdin_cancel_liveness_probe.py \
+            --script tests/integration/stdin_cancel_liveness_probe.ts \
+            --output "stdin-cancel-${{ matrix.deno-version }}.json"
+          cat "stdin-cancel-${{ matrix.deno-version }}.json" >> "$GITHUB_STEP_SUMMARY"
+      - name: Upload exact lifecycle result
+        uses: actions/upload-artifact@v4
+        with:
+          name: stdin-cancel-${{ matrix.deno-version }}
+          path: stdin-cancel-${{ matrix.deno-version }}.json
+          if-no-files-found: error
