@@ -1,0 +1,54 @@
+name: Fieldwork fetch family-racing probe
+
+on:
+  pull_request:
+    paths:
+      - '.github/workflows/fieldwork-fetch-family-racing.yml'
+      - 'tests/integration/fetch_family_racing_probe.ts'
+      - 'ext/fetch/**'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  stable-release-probe:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@v4
+      - uses: denoland/setup-deno@v2
+        with:
+          deno-version: v2.9.4
+      - name: Add deterministic dual-stack hostname
+        run: |
+          printf '%s\n' '::1 dualstack-fieldwork.test' | sudo tee -a /etc/hosts
+          printf '%s\n' '127.0.0.1 dualstack-fieldwork.test' | sudo tee -a /etc/hosts
+          getent ahosts dualstack-fieldwork.test
+      - name: Accepted IPv6 TCP with silent HTTP is a response stall
+        env:
+          FIELDWORK_PORT: '19371'
+          FIELDWORK_TIMEOUT_MS: '1500'
+        run: |
+          deno run --allow-net --allow-env tests/integration/fetch_family_racing_probe.ts response-stall \
+            | tee response-stall.json
+      - name: Pending IPv6 connect races healthy IPv4
+        env:
+          FIELDWORK_PORT: '19372'
+          FIELDWORK_TIMEOUT_MS: '2000'
+        run: |
+          sudo ip6tables -I OUTPUT 1 -p tcp -d ::1 --dport "$FIELDWORK_PORT" --tcp-flags SYN SYN -j DROP
+          cleanup() {
+            sudo ip6tables -D OUTPUT -p tcp -d ::1 --dport "$FIELDWORK_PORT" --tcp-flags SYN SYN -j DROP || true
+          }
+          trap cleanup EXIT HUP INT TERM
+          deno run --allow-net --allow-env tests/integration/fetch_family_racing_probe.ts connect-race \
+            | tee connect-race.json
+      - name: Upload exact results
+        uses: actions/upload-artifact@v4
+        with:
+          name: fetch-family-racing-results
+          path: |
+            response-stall.json
+            connect-race.json
+          if-no-files-found: error
