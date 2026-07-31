@@ -1,7 +1,7 @@
 diff --git a/cli/tools/installer/global.rs b/cli/tools/installer/global.rs
 --- a/cli/tools/installer/global.rs
 +++ b/cli/tools/installer/global.rs
-@@ -178,7 +178,30 @@ pub async fn install_global(
+@@ -178,16 +178,54 @@ pub async fn install_global(
      let mut extra_imports = workspace_member_imports.clone();
      extra_imports
        .extend(package_json_dep_import_entries(&name_and_url.module_url));
@@ -33,7 +33,8 @@ diff --git a/cli/tools/installer/global.rs b/cli/tools/installer/global.rs
        &name_and_url,
        &flags,
        cli_options.initial_cwd(),
-@@ -187,7 +210,22 @@ pub async fn install_global(
+       &installation_dir,
+       Some(&jsr_lockfile_fetcher),
        install_flags_global.force,
        &extra_imports,
      )
