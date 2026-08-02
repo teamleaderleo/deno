@@ -1,0 +1,10 @@
+{
+  "name": "@denotest/lifecycle-scripts-failing",
+  "version": "1.0.0",
+  "bin": {
+    "lifecycle-scripts-failing": "./main.js"
+  },
+  "scripts": {
+    "postinstall": "deno run -A ./postinstall.js"
+  }
+}
