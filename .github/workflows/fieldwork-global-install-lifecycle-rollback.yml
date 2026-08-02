@@ -1,0 +1,52 @@
+name: Fieldwork global install lifecycle rollback
+
+on:
+  pull_request:
+    paths:
+      - 'fieldwork/global-install-lifecycle-rollback/**'
+      - 'tests/specs/install/global/lifecycle_script_failure_cleanup/**'
+      - '.github/workflows/fieldwork-global-install-lifecycle-rollback.yml'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.event.pull_request.number || github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  focused-linux:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 90
+    steps:
+      - name: Check out exact owned head
+        uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd
+        with:
+          ref: ${{ github.event.pull_request.head.sha || github.sha }}
+          persist-credentials: false
+
+      - name: Apply exact cleanup candidate
+        run: |
+          test "$(git rev-parse HEAD)" = "${{ github.event.pull_request.head.sha || github.sha }}"
+          git apply --check fieldwork/global-install-lifecycle-rollback/candidate.patch
+          git apply fieldwork/global-install-lifecycle-rollback/candidate.patch
+          git diff --check
+
+      - name: Check changed source formatting
+        run: cargo fmt --all -- --check
+
+      - name: Run focused lifecycle rollback spec
+        run: |
+          set -o pipefail
+          cargo test specs::install::global::lifecycle_script_failure_cleanup -- --no-capture \
+            | tee fieldwork-global-install-lifecycle-rollback.log
+
+      - name: Upload focused receipt
+        if: always()
+        uses: actions/upload-artifact@65c4c4a1ddee5b72f698fdd19549f0f0fb45cf08
+        with:
+          name: fieldwork-global-install-lifecycle-rollback
+          path: fieldwork-global-install-lifecycle-rollback.log
+          if-no-files-found: warn
+          retention-days: 30
