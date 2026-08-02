@@ -1,2 +1,2 @@
-Deno.writeTextFileSync(new URL("./attempt.txt", import.meta.url), "attempted\n");
-Deno.exit(1);
+require("node:fs").writeFileSync("attempt.txt", "attempted\n");
+process.exit(1);
