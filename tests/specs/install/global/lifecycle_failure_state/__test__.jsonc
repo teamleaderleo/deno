@@ -1,0 +1,26 @@
+{
+  "tempDir": true,
+  "steps": [{
+    "args": "install -g --allow-scripts --root ./bins --name lifecycle-scripts-failing npm:@denotest/lifecycle-scripts-failing",
+    "output": "first_install.out",
+    "exitCode": 1
+  }, {
+    "args": "eval --allow-read \"const config = './bins/bin/.lifecycle-scripts-failing'; if (!Deno.statSync(config).isDirectory) throw new Error('missing retained config directory'); const attempt = config + '/node_modules/@denotest/lifecycle-scripts-failing/attempt.txt'; if (Deno.readTextFileSync(attempt) !== 'attempted\\n') throw new Error('missing lifecycle attempt marker'); for (const path of ['./bins/bin/lifecycle-scripts-failing', './bins/bin/lifecycle-scripts-failing.cmd']) { try { Deno.statSync(path); throw new Error('unexpected published shim: ' + path); } catch (error) { if (!(error instanceof Deno.errors.NotFound)) throw error; } }\"",
+    "output": "empty.out"
+  }, {
+    "args": "install -g --allow-scripts --root ./bins --name lifecycle-scripts-failing npm:@denotest/lifecycle-scripts-failing",
+    "output": "second_install.out"
+  }, {
+    "if": "unix",
+    "commandName": "./bins/bin/lifecycle-scripts-failing",
+    "args": [],
+    "output": "run.out",
+    "exitCode": 0
+  }, {
+    "if": "windows",
+    "commandName": "./bins/bin/lifecycle-scripts-failing.cmd",
+    "args": [],
+    "output": "run.out",
+    "exitCode": 0
+  }]
+}
