@@ -5,6 +5,6 @@
     "lifecycle-scripts-failing": "./main.js"
   },
   "scripts": {
-    "postinstall": "deno run -A ./postinstall.js"
+    "postinstall": "node ./postinstall.js"
   }
 }
