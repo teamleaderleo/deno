@@ -12,6 +12,9 @@ concurrency:
   group: materialize-global-lifecycle-${{ github.event.pull_request.number }}
   cancel-in-progress: true
 
+env:
+  SOURCE_BASE: 3ee245fe9da563cacb0b6458c4280b5a2758782c
+
 jobs:
   materialize:
     runs-on: ubuntu-24.04
@@ -21,7 +24,7 @@ jobs:
         uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5448d1c267
         with:
           ref: ${{ github.event.pull_request.head.sha }}
-          fetch-depth: 2
+          fetch-depth: 0
           persist-credentials: true
 
       - name: Check out accepted evidence carrier
@@ -37,8 +40,8 @@ jobs:
         run: |
           set -euo pipefail
           test "$(git rev-parse HEAD)" = "${{ github.event.pull_request.head.sha }}"
-          test "$(git rev-parse HEAD^)" = 3ee245fe9da563cacb0b6458c4280b5a2758782c
-          test "$(git diff --name-only HEAD^ HEAD)" = .github/workflows/fieldwork-materialize-global-lifecycle-cleanup.yml
+          test "$(git merge-base HEAD "$SOURCE_BASE")" = "$SOURCE_BASE"
+          test "$(git diff --name-only "$SOURCE_BASE" HEAD)" = .github/workflows/fieldwork-materialize-global-lifecycle-cleanup.yml
 
           git apply --check accepted-carrier/fieldwork/global-install-lifecycle-rollback/candidate.patch
           git apply accepted-carrier/fieldwork/global-install-lifecycle-rollback/candidate.patch
@@ -51,8 +54,8 @@ jobs:
 
           rm .github/workflows/fieldwork-materialize-global-lifecycle-cleanup.yml
 
-          test "$(git diff --name-only | sort)" = $'.github/workflows/fieldwork-materialize-global-lifecycle-cleanup.yml\ncli/tools/installer/global.rs\ntests/specs/install/global/lifecycle_script_failure_cleanup/__test__.jsonc\ntests/specs/install/global/lifecycle_script_failure_cleanup/inspect.js'
-          git diff --check
+          test "$(git diff --name-only "$SOURCE_BASE" | sort)" = $'cli/tools/installer/global.rs\ntests/specs/install/global/lifecycle_script_failure_cleanup/__test__.jsonc\ntests/specs/install/global/lifecycle_script_failure_cleanup/inspect.js'
+          git diff --check "$SOURCE_BASE"
 
       - name: Check formatting
         run: cargo fmt --all -- --check
