@@ -21,14 +21,14 @@ jobs:
     timeout-minutes: 120
     steps:
       - name: Check out materialization branch
-        uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5448d1c267
+        uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd
         with:
           ref: ${{ github.event.pull_request.head.sha }}
           fetch-depth: 0
           persist-credentials: true
 
       - name: Check out accepted evidence carrier
-        uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5448d1c267
+        uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd
         with:
           repository: teamleaderleo/deno
           ref: 1274eed56373dd54f5978e1fd7e86e04f6463583
