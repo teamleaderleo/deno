@@ -1,0 +1,45 @@
+{
+  "tempDir": true,
+  "steps": [
+    {
+      "args": [
+        "install",
+        "--global",
+        "--root",
+        "./root",
+        "--allow-scripts",
+        "npm:@denotest/print-npm-user-agent@1.0.0"
+      ],
+      "output": "[WILDCARD]postinstall[WILDCARD]failed with exit code 1[WILDCARD]",
+      "exitCode": 1
+    },
+    {
+      "args": [
+        "run",
+        "--allow-read=./root/bin",
+        "inspect.js"
+      ],
+      "output": "{\"config\":false,\"shim\":false}\n"
+    },
+    {
+      "args": [
+        "install",
+        "--global",
+        "--root",
+        "./root",
+        "--allow-scripts",
+        "npm:@denotest/print-npm-user-agent@1.0.0"
+      ],
+      "output": "[WILDCARD]postinstall[WILDCARD]failed with exit code 1[WILDCARD]",
+      "exitCode": 1
+    },
+    {
+      "args": [
+        "run",
+        "--allow-read=./root/bin",
+        "inspect.js"
+      ],
+      "output": "{\"config\":false,\"shim\":false}\n"
+    }
+  ]
+}
