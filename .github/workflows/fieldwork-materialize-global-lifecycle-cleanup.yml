@@ -47,6 +47,7 @@ jobs:
           mkdir -p "$fixture"
           cp "accepted-carrier/$fixture/__test__.jsonc" "$fixture/__test__.jsonc"
           cp "accepted-carrier/$fixture/inspect.js" "$fixture/inspect.js"
+          git add -N "$fixture/__test__.jsonc" "$fixture/inspect.js"
 
           rm .github/workflows/fieldwork-materialize-global-lifecycle-cleanup.yml
 
