@@ -1,0 +1,79 @@
+name: Materialize global lifecycle cleanup
+
+on:
+  pull_request:
+    paths:
+      - .github/workflows/fieldwork-materialize-global-lifecycle-cleanup.yml
+
+permissions:
+  contents: write
+
+concurrency:
+  group: materialize-global-lifecycle-${{ github.event.pull_request.number }}
+  cancel-in-progress: true
+
+jobs:
+  materialize:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 120
+    steps:
+      - name: Check out materialization branch
+        uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5448d1c267
+        with:
+          ref: ${{ github.event.pull_request.head.sha }}
+          fetch-depth: 2
+          persist-credentials: true
+
+      - name: Check out accepted evidence carrier
+        uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5448d1c267
+        with:
+          repository: teamleaderleo/deno
+          ref: 1274eed56373dd54f5978e1fd7e86e04f6463583
+          persist-credentials: false
+          path: accepted-carrier
+
+      - name: Apply accepted source and native regression
+        shell: bash
+        run: |
+          set -euo pipefail
+          test "$(git rev-parse HEAD)" = "${{ github.event.pull_request.head.sha }}"
+          test "$(git rev-parse HEAD^)" = 3ee245fe9da563cacb0b6458c4280b5a2758782c
+          test "$(git diff --name-only HEAD^ HEAD)" = .github/workflows/fieldwork-materialize-global-lifecycle-cleanup.yml
+
+          git apply --check accepted-carrier/fieldwork/global-install-lifecycle-rollback/candidate.patch
+          git apply accepted-carrier/fieldwork/global-install-lifecycle-rollback/candidate.patch
+
+          fixture=tests/specs/install/global/lifecycle_script_failure_cleanup
+          mkdir -p "$fixture"
+          cp "accepted-carrier/$fixture/__test__.jsonc" "$fixture/__test__.jsonc"
+          cp "accepted-carrier/$fixture/inspect.js" "$fixture/inspect.js"
+
+          rm .github/workflows/fieldwork-materialize-global-lifecycle-cleanup.yml
+
+          test "$(git diff --name-only | sort)" = $'.github/workflows/fieldwork-materialize-global-lifecycle-cleanup.yml\ncli/tools/installer/global.rs\ntests/specs/install/global/lifecycle_script_failure_cleanup/__test__.jsonc\ntests/specs/install/global/lifecycle_script_failure_cleanup/inspect.js'
+          git diff --check
+
+      - name: Check formatting
+        run: cargo fmt --all -- --check
+
+      - name: Run focused lifecycle rollback spec
+        shell: bash
+        run: |
+          set -euo pipefail
+          set -o pipefail
+          cargo test specs::install::global::lifecycle_script_failure_cleanup -- --no-capture \
+            | tee lifecycle-cleanup-materialization.log
+
+      - name: Commit source-only result
+        shell: bash
+        run: |
+          set -euo pipefail
+          git config user.name github-actions[bot]
+          git config user.email 41898282+github-actions[bot]@users.noreply.github.com
+          git add \
+            cli/tools/installer/global.rs \
+            tests/specs/install/global/lifecycle_script_failure_cleanup/__test__.jsonc \
+            tests/specs/install/global/lifecycle_script_failure_cleanup/inspect.js \
+            .github/workflows/fieldwork-materialize-global-lifecycle-cleanup.yml
+          git commit -m $'fix(install): clean failed global lifecycle setup\n\nAssisted-by: ChatGPT (GPT-5.6 Thinking)'
+          git push origin "HEAD:${{ github.head_ref }}"
