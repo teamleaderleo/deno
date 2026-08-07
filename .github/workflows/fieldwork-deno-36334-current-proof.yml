@@ -1,0 +1,188 @@
+name: Fieldwork Deno 36334 current proof
+
+on:
+  pull_request:
+    branches:
+      - fieldwork/deno-36334-current-base
+    paths:
+      - .github/workflows/fieldwork-deno-36334-current-proof.yml
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  fresh-install-rollback:
+    runs-on: ubuntu-latest
+    timeout-minutes: 90
+    steps:
+      - name: Check out execution carrier
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+          persist-credentials: false
+
+      - name: Verify exact current-public source and carrier fence
+        shell: bash
+        run: |
+          set -euo pipefail
+          test "$(git merge-base HEAD fieldwork/deno-36334-current-base)" = "464ca273f280fe015f83ea2e088abca2560192a0"
+          git diff --name-only 464ca273f280fe015f83ea2e088abca2560192a0..HEAD | sort > actual
+          printf '%s\n' .github/workflows/fieldwork-deno-36334-current-proof.yml | sort > expected
+          diff -u expected actual
+          rm actual expected
+          test "$(git hash-object cli/tools/installer/global.rs)" = "f6fe0bdea92aa2d17d9d1117bb79b30953b56370"
+
+      - name: Materialize accepted fresh-install repair in workspace only
+        shell: python
+        run: |
+          from pathlib import Path
+
+          path = Path('cli/tools/installer/global.rs')
+          text = path.read_text()
+          old = '''    setup_config_dir(
+            &name_and_url,
+            &flags,
+            cli_options.initial_cwd(),
+            &installation_dir,
+            Some(&jsr_lockfile_fetcher),
+            install_flags_global.force,
+            &extra_imports,
+          )
+          .await?;
+          '''
+          new = '''    let config_dir = installation_dir.join(format!(".{}", name_and_url.name));
+          let primary_shim = if cfg!(windows) {
+            installation_dir
+              .join(&name_and_url.name)
+              .with_extension("cmd")
+          } else {
+            installation_dir.join(&name_and_url.name)
+          };
+          let had_published_install = primary_shim.exists();
+
+          // A prior failed install can leave the private command directory behind
+          // without ever publishing a shim. Treat that as incomplete setup, not as a
+          // reusable completed install.
+          if !had_published_install && config_dir.is_dir() {
+            fs::remove_dir_all(&config_dir).with_context(|| {
+              format!(
+                "failed removing incomplete install state '{}'",
+                config_dir.display()
+              )
+            })?;
+          }
+
+          let setup_result = setup_config_dir(
+            &name_and_url,
+            &flags,
+            cli_options.initial_cwd(),
+            &installation_dir,
+            Some(&jsr_lockfile_fetcher),
+            install_flags_global.force,
+            &extra_imports,
+          )
+          .await;
+
+          if let Err(err) = setup_result {
+            // Preserve an existing published command. Fresh setup owns everything
+            // under the private command directory until the shim is published.
+            if !had_published_install && config_dir.is_dir() {
+              if let Err(cleanup_err) = fs::remove_dir_all(&config_dir) {
+                log::warn!(
+                  "Failed cleaning incomplete global install '{}': {:#}",
+                  config_dir.display(),
+                  cleanup_err
+                );
+              }
+            }
+            return Err(err);
+          }
+          '''
+          if text.count(old) != 1:
+              raise SystemExit(f'expected one setup block, found {text.count(old)}')
+          path.write_text(text.replace(old, new))
+
+          test_dir = Path('tests/specs/install/global/lifecycle_script_failure_cleanup')
+          test_dir.mkdir(parents=True, exist_ok=True)
+          (test_dir / '__test__.jsonc').write_text(r'''{
+            "tempDir": true,
+            "steps": [
+              {
+                "args": [
+                  "install",
+                  "--global",
+                  "--root",
+                  "./root",
+                  "--allow-scripts",
+                  "npm:@denotest/print-npm-user-agent@1.0.0"
+                ],
+                "output": "[WILDCARD]postinstall[WILDCARD]failed with exit code 1[WILDCARD]",
+                "exitCode": 1
+              },
+              {
+                "args": ["run", "--allow-read=./root/bin", "inspect.js"],
+                "output": "{\\"config\\":false,\\"shim\\":false}\\n"
+              },
+              {
+                "args": [
+                  "install",
+                  "--global",
+                  "--root",
+                  "./root",
+                  "--allow-scripts",
+                  "npm:@denotest/print-npm-user-agent@1.0.0"
+                ],
+                "output": "[WILDCARD]postinstall[WILDCARD]failed with exit code 1[WILDCARD]",
+                "exitCode": 1
+              },
+              {
+                "args": ["run", "--allow-read=./root/bin", "inspect.js"],
+                "output": "{\\"config\\":false,\\"shim\\":false}\\n"
+              }
+            ]
+          }
+          ''')
+          (test_dir / 'inspect.js').write_text(r'''const exists = (path) => {
+            try {
+              Deno.statSync(path);
+              return true;
+            } catch {
+              return false;
+            }
+          };
+
+          console.log(JSON.stringify({
+            config: exists("root/bin/.print-npm-user-agent"),
+            shim: exists("root/bin/print-npm-user-agent") ||
+              exists("root/bin/print-npm-user-agent.cmd"),
+          }));
+          ''')
+
+      - name: Check exact repair fence
+        shell: bash
+        run: |
+          set -euo pipefail
+          git diff --check
+          git diff --name-only | sort > actual
+          printf '%s\n' \
+            cli/tools/installer/global.rs \
+            tests/specs/install/global/lifecycle_script_failure_cleanup/__test__.jsonc \
+            tests/specs/install/global/lifecycle_script_failure_cleanup/inspect.js | sort > expected
+          diff -u expected actual
+          rm actual expected
+
+      - name: Run repository formatter
+        run: cargo fmt --all -- --check
+
+      - name: Run focused lifecycle rollback spec
+        run: cargo test specs::install::global::lifecycle_script_failure_cleanup -- --no-capture
+
+      - name: Verify product source was not published
+        shell: bash
+        run: |
+          set -euo pipefail
+          git reset --hard HEAD
+          git clean -fd
+          test "$(git hash-object cli/tools/installer/global.rs)" = "f6fe0bdea92aa2d17d9d1117bb79b30953b56370"
+          test -z "$(git status --porcelain)"
